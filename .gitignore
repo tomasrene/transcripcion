@@ -1,0 +1,16 @@
+client_secrets.json
+venv
+_pycache
+test.py
+*.mp3
+*.mp4
+*.wav
+*.flac
+*.ogg
+*.m4a
+*.mov
+*.avi
+*.wmv
+*.mpeg
+*.mpg
+*.mkv
