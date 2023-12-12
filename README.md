@@ -1,6 +1,6 @@
-# VideoTranscriptor
+# Transcriptor
 
-VideoTranscriptor es una herramienta de Python para transcribir audio de videos de YouTube, Google Drive o archivos locales. La herramienta extrae el audio de los videos, lo transcribe utilizando el modelo de transcripción Whisper y guarda los resultados de la transcripción en un archivo de texto o documento.
+Transcriptor es una herramienta de Python para transcribir audio de videos de YouTube, Google Drive o archivos locales. La herramienta extrae el audio de los videos, lo transcribe utilizando el modelo de transcripción Whisper y guarda los resultados de la transcripción en un archivo de texto o documento.
 
 ## Requisitos
 

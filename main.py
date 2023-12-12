@@ -54,10 +54,10 @@ class OutputFormat(Enum):
     DOC = 'doc'
 
 
-class VideoTranscriptor:
+class Transcriptor:
     def __init__(self, source_type, source_format, source_id=None, intermediate_folder='temp', audio_file_type=AudioFileType.MP3, keep_intermediate_files=True, transcription_model=TranscriptionModel.WHISPER, transcription_quality=TranscriptionQuality.BASE, output_folder='output', output_format=OutputFormat.TXT):
         """
-        Initializes the VideoTranscriptor object.
+        Initializes the Transcriptor object.
 
         Args:
             source_type (str): The type of source for transcription.
