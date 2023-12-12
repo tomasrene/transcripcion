@@ -1,4 +1,4 @@
-openai-whisper
-pydub
-yt-dlp
-PyDrive
+openai-whisper==20231117
+pydub==0.25.1
+yt-dlp==2023.11.16
+PyDrive==1.3.1
