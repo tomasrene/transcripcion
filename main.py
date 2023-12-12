@@ -275,7 +275,7 @@ class VideoTranscriptor:
             logging.info("Extracting audio from local video...")
             video_name = video_path.stem
             video = AudioSegment.from_file(video_path)
-            audio_output_path = self.intermediate_folder / f'{video_name}.{self.audio_file_type.value}'
+            audio_output_path = self.intermediate_folder / f'{video_name}'
             video.export(audio_output_path, format=f"{self.audio_file_type.value}")
             logging.info("Audio extraction completed.")
         except Exception as e:
