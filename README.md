@@ -6,6 +6,7 @@ Transcriptor es una herramienta de Python para transcribir audio de videos de Yo
 
 - Python 3.7 o superior
 - Bibliotecas de Python: `os`, `logging`, `enum`, `pathlib`, `pydub`, `yt_dlp`, `whisper`, `pydrive`
+- Para la autenticación con Google Drive, es necesario un archivo `client_secrets.json` en la raíz del proyecto con los permisos adecuados.
 
 ## Instalación
 
