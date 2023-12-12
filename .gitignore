@@ -1,6 +1,6 @@
 client_secrets.json
 venv
-_pycache
+__pycache__
 test.py
 .DS_Store
 *.mp3

@@ -1,177 +1,364 @@
 import os
+import logging
+from enum import Enum
+from pathlib import Path
 from pydub import AudioSegment
 import yt_dlp
 import whisper
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-class VideoTranscriptor:
-    def __init__(self, source_type, source_format, source_id=None, intermediate_folder='temp', audio_file_type='mp3', keep_intermediate_files=True, transcription_model='whisper', transcription_quality='base', output_folder='output', output_format='txt'):
-        assert source_type in ['youtube', 'drive', 'local'], "source must be either 'youtube', 'drive' or 'local'"
-        assert source_format in ['one', 'multiple'], "source_type must be 'one' or 'multiple'"
-        assert audio_file_type in ['mp3', 'wav'], "audio_file_type must be either 'mp3' or 'wav'"
-        assert keep_intermediate_files in [True, False], "keep_intermediate_files must be either True or False"
-        assert transcription_model in ['whisper'], "For now the only transcription model available is 'whisper"
-        assert transcription_quality in ['base', 'medium','large'], "quality must be either 'base', 'medium', or 'large'"
-        assert output_format in ['txt', 'doc'], "output_format must be either 'txt' or 'doc'"
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+class SourceType(Enum):
+    """
+    Enum class representing the source types for transcription.
+    """
+    YOUTUBE = 'youtube'
+    DRIVE = 'drive'
+    LOCAL = 'local'
+
+class SourceFormat(Enum):
+    """
+    Enum class representing the source formats for transcription.
+    """
+    ONE = 'one'
+    MULTIPLE = 'multiple'
+
+class AudioFileType(Enum):
+    """
+    Enum class representing the audio file types for transcription.
+    """
+    MP3 = 'mp3'
+    WAV = 'wav'
+
+class TranscriptionModel(Enum):
+    """
+    Enum class representing the transcription models for audio transcription.
+    """
+    WHISPER = 'whisper'
+
+class TranscriptionQuality(Enum):
+    """
+    Enum class representing the transcription quality levels for audio transcription.
+    """
+    BASE = 'base'
+    MEDIUM = 'medium'
+    LARGE = 'large'
+
+class OutputFormat(Enum):
+    """
+    Enum class representing the output formats for transcription results.
+    """
+    TXT = 'txt'
+    DOC = 'doc'
+
+
+class VideoTranscriptor:
+    def __init__(self, source_type, source_format, source_id=None, intermediate_folder='temp', audio_file_type=AudioFileType.MP3, keep_intermediate_files=True, transcription_model=TranscriptionModel.WHISPER, transcription_quality=TranscriptionQuality.BASE, output_folder='output', output_format=OutputFormat.TXT):
+        """
+        Initializes the VideoTranscriptor object.
+
+        Args:
+            source_type (str): The type of source for transcription.
+            source_format (str): The format of the source for transcription.
+            source_id (str, optional): The ID of the source. Defaults to None.
+            intermediate_folder (str, optional): The folder to store intermediate files. Defaults to 'temp'.
+            audio_file_type (AudioFileType, optional): The type of audio file for transcription. Defaults to AudioFileType.MP3.
+            keep_intermediate_files (bool, optional): Whether to keep intermediate files. Defaults to True.
+            transcription_model (TranscriptionModel, optional): The transcription model to use. Defaults to TranscriptionModel.WHISPER.
+            transcription_quality (TranscriptionQuality, optional): The quality level for audio transcription. Defaults to TranscriptionQuality.BASE.
+            output_folder (str, optional): The folder to store the transcription output. Defaults to 'output'.
+            output_format (OutputFormat, optional): The format of the transcription output. Defaults to OutputFormat.TXT.
+        """
         self.source_id = source_id
-        self.source_type = source_type
-        self.source_format = source_format
-        self.intermediate_folder = intermediate_folder
+        self.source_type = SourceType(source_type)
+        self.source_format = SourceFormat(source_format)
+        self.intermediate_folder = Path(intermediate_folder)
         self.audio_file_type = audio_file_type
         self.keep_intermediate_files = keep_intermediate_files
         self.transcription_model = transcription_model
         self.transcription_quality = transcription_quality
-        self.output_folder = output_folder
+        self.output_folder = Path(output_folder)
         self.output_format = output_format
-    
-    def process_link(self):
-        if self.source_type == 'drive':
-            self.authenticate_drive()
+        self.drive = None
 
-            if self.source_format == 'one':
-                # Obtener el título del video
+    def process_source(self):
+        """
+        Processes the source for transcription.
+        """
+        try:
+            logging.info("Processing source...")
+            if self.source_type == SourceType.DRIVE:
+                self.authenticate_drive()
+
+                if self.source_format == SourceFormat.ONE:
+                    self.extract_google_audio(self.source_id)
+                
+                elif self.source_format == SourceFormat.MULTIPLE:
+                    self.process_drive_directory(self.source_id)
+            
+            elif self.source_type == SourceType.YOUTUBE:
                 self.extract_google_audio(self.source_id)
-            
-            elif self.source_format == 'multiple':
-                self.process_drive_directory(self.source_id)
-        
-        elif self.source_type == 'youtube':
-            self.extract_google_audio(self.source_id)
 
-        elif self.source_type == 'local':
-            if self.source_format == 'one':
-                self.extract_local_audio(f'./input/{self.source_id}')
-            
-            elif self.source_format == 'multiple':
-                for root, dirs, files in os.walk(f'./input/{self.source_id}'):
-                    for file in files:
-                        if file.endswith(('.mp4', '.avi', '.mov')):  # add or modify the file extensions as needed
-                            self.extract_local_audio(os.path.join(root, file))
+            elif self.source_type == SourceType.LOCAL:
+                self.process_local_files()
 
-            return
+            logging.info("Source processing completed.")
+        except Exception as e:
+            logging.error("Error processing source: %s", e)
+            raise
 
     def authenticate_drive(self):
-        #### TODO: Authentication with Google Drive
-        gauth = GoogleAuth()
-        self.drive = GoogleDrive(gauth)
-
-        return
+        """
+        Authenticates with Google Drive.
+        """
+        try:
+            logging.info("Authenticating with Google Drive...")
+            gauth = GoogleAuth()
+            self.drive = GoogleDrive(gauth)
+            logging.info("Google Drive authentication successful.")
+        except Exception as e:
+            logging.error("Error authenticating with Google Drive: %s", e)
+            raise
 
     def write_query(self, folder_id, file_type):
+        """
+        Writes a query for retrieving files from Google Drive.
+
+        Args:
+            folder_id (str): The ID of the folder.
+            file_type (str): The type of file.
+
+        Returns:
+            str: The query string.
+        """
         return f"'{folder_id}' in parents and (mimeType contains '{file_type}/')"
 
     def process_drive_directory(self, folder_id):
-        # Obtener la lista de archivos
-        file_list = self.drive.ListFile({'q': self.write_query(folder_id,"video")}).GetList()
+        """
+        Processes a directory in Google Drive.
 
-        # Imprimir los IDs de los archivos
+        Args:
+            folder_id (str): The ID of the folder.
+        """
+        try:
+            logging.info("Processing Google Drive directory...")
+            self.process_drive_files(folder_id, "video")
+            self.process_drive_files(folder_id, "audio")
+            self.process_drive_subfolders(folder_id)
+            logging.info("Google Drive directory processing completed.")
+        except Exception as e:
+            logging.error("Error processing Google Drive directory: %s", e)
+            raise
+
+    def process_drive_files(self, folder_id, file_type):
+        """
+        Processes files in a Google Drive folder.
+
+        Args:
+            folder_id (str): The ID of the folder.
+            file_type (str): The type of file.
+        """
+        file_list = self.drive.ListFile({'q': self.write_query(folder_id, file_type)}).GetList()
         for file in file_list:
-            self.extract_google_audio(file['id'])
+            if file_type == "video":
+                self.extract_google_audio(file['id'])
+            elif file_type == "audio":
+                file.GetContentFile(self.intermediate_folder / file["title"])
 
-        # Obtener la lista de archivos
-        file_list = self.drive.ListFile({'q': self.write_query(folder_id,"audio")}).GetList()
+    def process_drive_subfolders(self, folder_id):
+        """
+        Processes subfolders in a Google Drive folder.
 
-        # Imprimir los IDs de los archivos
-        for file in file_list:
-            # Descargar el archivo
-            file.GetContentFile(f'./{self.intermediate_folder}/{file["title"]}')
-        
-        # Obtener la lista de subcarpetas
+        Args:
+            folder_id (str): The ID of the folder.
+        """
         folder_list = self.drive.ListFile({'q': self.write_query(folder_id, "application/vnd.google-apps.folder")}).GetList()
-
-        # Recorrer cada subcarpeta y listar los archivos en ellas
         for folder in folder_list:
             self.process_drive_directory(folder['id'])
-                
-    def extract_google_audio(self, video_id):
-        # Obtener el enlace de descarga del video
-        if self.source_type == 'youtube':
-            if self.source_format == 'one':
-                video_url = f'https://www.youtube.com/watch?v={video_id}'
-            elif self.source_format == 'multiple':
-                video_url = f'https://www.youtube.com/playlist?list={video_id}'
 
-        elif self.source_type == 'drive':
-            video_url = f'https://drive.google.com/uc?id={video_id}'
-        
-        # Descargar el audio utilizando yt-dlp
+    def extract_google_audio(self, video_id):
+        """
+        Extracts audio from a Google Drive or YouTube video.
+
+        Args:
+            video_id (str): The ID of the video.
+        """
+        try:
+            logging.info("Extracting audio from Google video...")
+            video_url = self.get_video_url(video_id)
+            self.download_audio(video_url)
+            logging.info("Audio extraction completed.")
+        except Exception as e:
+            logging.error("Error extracting Google audio: %s", e)
+            raise
+
+    def get_video_url(self, video_id):
+        """
+        Gets the URL of a video based on the source type and format.
+
+        Args:
+            video_id (str): The ID of the video.
+
+        Returns:
+            str: The video URL.
+        """
+        if self.source_type == SourceType.YOUTUBE:
+            if self.source_format == SourceFormat.ONE:
+                return f'https://www.youtube.com/watch?v={video_id}'
+            elif self.source_format == SourceFormat.MULTIPLE:
+                return f'https://www.youtube.com/playlist?list={video_id}'
+        elif self.source_type == SourceType.DRIVE:
+            return f'https://drive.google.com/uc?id={video_id}'
+
+    def download_audio(self, video_url):
+        """
+        Downloads the audio from a video.
+
+        Args:
+            video_url (str): The URL of the video.
+        """
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': self.audio_file_type,
+                'preferredcodec': self.audio_file_type.value,
                 'preferredquality': '192'
             }],
-            'outtmpl': f'./{self.intermediate_folder}/%(title)s.%(ext)s',  # Ruta y nombre del archivo de salida de audio
-            #'outtmpl': f'./{self.intermediate_folder}/{video_title}'  # Ruta y nombre del archivo de salida de audio
+            'outtmpl': str(self.intermediate_folder / '%(title)s.%(ext)s')
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
-        
-        return
+
+    def process_local_files(self):
+        """
+        Processes local files for transcription.
+        """
+        try:
+            path = f'./input/{self.source_id}'
+            if not os.path.exists(path):
+                logging.error("Path does not exist: %s", path)
+                return
+            if os.path.isfile(path):
+                logging.error("Expected a directory, but found a file: %s", path)
+                return
+            if not os.listdir(path):
+                logging.error("Directory is empty: %s", path)
+                return
+
+            logging.info("Processing local files...")
+            for root, _, files in os.walk(path):
+                for file in files:
+                    if file.endswith(('.mp4', '.avi', '.mov')):
+                        self.extract_local_audio(Path(root) / file)
+            logging.info("Local file processing completed.")
+        except FileNotFoundError:
+            logging.error("File not found: %s", path)
+        except IsADirectoryError:
+            logging.error("Expected a file, but found a directory: %s", path)
+        except PermissionError:
+            logging.error("Permission denied: %s", path)
+        except Exception as e:
+            logging.error("Error processing local files: %s", e)
+            raise
 
     def extract_local_audio(self, video_path):
-        # Extraer el nombre del video
-        video_name = os.path.splitext(os.path.split(video_path)[-1])[0]
+        """
+        Extracts audio from a local video file.
 
-        # Cargar el archivo de video
-        video = AudioSegment.from_file(video_path)
-
-        # Ruta de salida del archivo de audio
-        audio_output_path = f'./{self.intermediate_folder}/{video_name}.{self.audio_file_type}'
-
-        # Exportar el archivo de audio
-        video.export(audio_output_path, format=f"{self.audio_file_type}")
-
-        return
+        Args:
+            video_path (str): The path to the video file.
+        """
+        try:
+            logging.info("Extracting audio from local video...")
+            video_name = video_path.stem
+            video = AudioSegment.from_file(video_path)
+            audio_output_path = self.intermediate_folder / f'{video_name}.{self.audio_file_type.value}'
+            video.export(audio_output_path, format=f"{self.audio_file_type.value}")
+            logging.info("Audio extraction completed.")
+        except Exception as e:
+            logging.error("Error extracting local audio: %s", e)
+            raise
 
     def transcribe_audio(self):
-        if self.transcription_model == 'whisper':
-            model = whisper.load_model(self.transcription_quality)
+        """
+        Transcribes the audio files using the selected transcription model.
 
-        # Recorrer los archivos de audio en la carpeta temporal
-        for file in os.listdir(f'./{self.intermediate_folder}'):
-            # Obtener el nombre del archivo
-            file_name = os.path.splitext(file)[0]
+        Returns:
+            None
+        """
+        try:
+            if not any(self.intermediate_folder.iterdir()):
+                logging.error("No files found in the intermediate folder.")
+                return
 
-            # Obtener la ruta del archivo
-            file_path = f'./{self.intermediate_folder}/{file}'
-            
-            # Cargar el audio
-            audio = AudioSegment.from_mp3(file_path)
+            logging.info("Transcribing audio...")
+            if self.transcription_model == TranscriptionModel.WHISPER:
+                model = whisper.load_model(self.transcription_quality.value)
 
-            # Dividir el audio en segmentos de 20 minutos
+            for file in self.intermediate_folder.iterdir():
+                self.transcribe_file(file, model)
+            logging.info("Audio transcription completed.")
+        except FileNotFoundError:
+            logging.error("File not found: %s", file)
+        except IsADirectoryError:
+            logging.error("Expected a file, but found a directory: %s", file)
+        except PermissionError:
+            logging.error("Permission denied: %s", file)
+        except Exception as e:
+            logging.error("Error transcribing audio: %s", e)
+            raise
+
+    def transcribe_file(self, file, model):
+        """
+        Transcribes a single audio file using the selected model.
+
+        Args:
+            file (str): The path to the audio file. Expected to be a .mp3 file.
+            model (whisper.Model): The transcription model.
+
+        Returns:
+            None
+        """
+        try:
+            file_name = file.stem
+            audio = AudioSegment.from_mp3(file)
             audio_chunks = [audio[i:i + 1200000] for i in range(0, len(audio), 1200000)]
 
-            with open(f'./{self.output_folder}/{file_name}.{self.output_format}', 'w') as f:
-    
+            with open(self.output_folder / f'{file_name}.{self.output_format.value}', 'w', encoding='utf-8') as f:
                 for i, chunk in enumerate(audio_chunks):
-                    temp_file_name = f'./{self.intermediate_folder}/{file_name}-chunk{i+1}.{self.audio_file_type}'
-                    
-                    # Exportar el segmento de audio
-                    chunk.export(temp_file_name, format=self.audio_file_type)
-
+                    temp_file_name = f'./{self.intermediate_folder}/{file_name}-chunk{i+1}'
+                    chunk.export(temp_file_name, format=self.audio_file_type.value)
                     result = model.transcribe(temp_file_name, fp16=False)
-
                     f.write(result["text"])
-                    f.write("\n")  # Agrega un salto de línea entre cada transcripción
-
+                    f.write("\n")
                     os.remove(temp_file_name)
-                    
-        return
-    
+        except FileNotFoundError:
+            logging.error("File not found: %s", file)
+        except IsADirectoryError:
+            logging.error("Expected a file, but found a directory: %s", file)
+        except PermissionError:
+            logging.error("Permission denied: %s", file)
+        except Exception as e:
+            logging.error("Error transcribing file: %s", e)
+            raise
+
     def clean_up(self):
-        # Código para eliminar los archivos temporales
-        if self.keep_intermediate_files == False:
-            for file in os.listdir(f'./{self.intermediate_folder}'):
-                os.remove(f'./{self.intermediate_folder}/{file}')
-        return
-    
+        """
+        Cleans up the intermediate files if keep_intermediate_files is set to False.
+        """
+        if not self.keep_intermediate_files:
+            for file in self.intermediate_folder.iterdir():
+                file.unlink()
+
     def process(self):
-        self.process_link()
+        """
+        Processes the source, transcribes the audio, and performs clean-up.
+        """
+        logging.info("Process started.")
+        self.process_source()
         self.transcribe_audio()
         self.clean_up()
-
+        logging.info("Process completed.")

@@ -1,15 +1,15 @@
 # VideoTranscriptor
 
-VideoTranscriptor es una clase de Python que permite transcribir audios de videos de YouTube, Google Drive o locales. La transcripción se realiza utilizando el modelo de transcripción 'whisper'.
+VideoTranscriptor es una herramienta de Python para transcribir audio de videos de YouTube, Google Drive o archivos locales. La herramienta extrae el audio de los videos, lo transcribe utilizando el modelo de transcripción Whisper y guarda los resultados de la transcripción en un archivo de texto o documento.
 
 ## Requisitos
 
-- Python 3.6+
-- Librerías: os, pydub, yt_dlp, whisper, pydrive
+- Python 3.7 o superior
+- Bibliotecas de Python: `os`, `logging`, `enum`, `pathlib`, `pydub`, `yt_dlp`, `whisper`, `pydrive`
 
 ## Instalación
 
-Para instalar las dependencias, ejecute el siguiente comando:
+Para instalar las dependencias necesarias, ejecute el siguiente comando:
 
 ```bash
 pip install pydub yt-dlp whisper pydrive
@@ -17,54 +17,36 @@ pip install pydub yt-dlp whisper pydrive
 
 ## Uso
 
-Para utilizar la clase VideoTranscriptor, primero debe instanciarla con los parámetros deseados. A continuación, se muestra un ejemplo de cómo hacerlo:
+Primero, importe la clase `VideoTranscriptor` de su script:
 
 ```python
-transcriptor = VideoTranscriptor(
-    source_type='youtube', 
-    source_format='one', 
-    source_id='video_id', 
-    intermediate_folder='temp', 
-    audio_file_type='mp3', 
-    keep_intermediate_files=True, 
-    transcription_model='whisper', 
-    transcription_quality='base', 
-    output_folder='output', 
-    output_format='txt'
-)
+from video_transcriptor import VideoTranscriptor
 ```
 
-Luego, puede llamar al método `process()` para iniciar el proceso de transcripción:
+Luego, cree una instancia de `VideoTranscriptor` y llame al método `process`:
 
 ```python
+transcriptor = VideoTranscriptor(source_type='youtube', source_format='one', source_id='VIDEO_ID')
 transcriptor.process()
 ```
 
-## Parámetros
+Los parámetros para el constructor de `VideoTranscriptor` son:
 
-- `source_type`: Tipo de fuente del video. Puede ser 'youtube', 'drive' o 'local'.
-- `source_format`: Formato de la fuente. Puede ser 'one' para un solo video o 'multiple' para múltiples videos.
-- `source_id`: ID del video o carpeta de videos. No es necesario para videos locales.
-- `intermediate_folder`: Carpeta para almacenar archivos intermedios.
-- `audio_file_type`: Tipo de archivo de audio a generar. Puede ser 'mp3' o 'wav'.
-- `keep_intermediate_files`: Si es True, se conservarán los archivos intermedios. Si es False, se eliminarán.
-- `transcription_model`: Modelo de transcripción a utilizar. Actualmente, solo se admite 'whisper'.
-- `transcription_quality`: Calidad de la transcripción. Puede ser 'base', 'medium' o 'large'.
-- `output_folder`: Carpeta para almacenar los archivos de transcripción.
-- `output_format`: Formato de los archivos de transcripción. Puede ser 'txt' o 'doc'.
+- `source_type`: El tipo de fuente para la transcripción. Puede ser 'youtube', 'drive' o 'local'.
+- `source_format`: El formato de la fuente para la transcripción. Puede ser 'one' o 'multiple'.
+- `source_id`: El ID de la fuente. Por defecto es None.
+- `intermediate_folder`: La carpeta para almacenar archivos intermedios. Por defecto es 'temp'.
+- `audio_file_type`: El tipo de archivo de audio para la transcripción. Por defecto es AudioFileType.MP3.
+- `keep_intermediate_files`: Si se deben mantener los archivos intermedios. Por defecto es True.
+- `transcription_model`: El modelo de transcripción a utilizar. Por defecto es TranscriptionModel.WHISPER.
+- `transcription_quality`: El nivel de calidad para la transcripción de audio. Por defecto es TranscriptionQuality.BASE.
+- `output_folder`: La carpeta para almacenar la salida de la transcripción. Por defecto es 'output'.
+- `output_format`: El formato de la salida de la transcripción. Por defecto es OutputFormat.TXT.
 
-## Métodos
+## Contribución
 
-- `process_link()`: Procesa el enlace de la fuente.
-- `authenticate_drive()`: Autentica con Google Drive.
-- `write_query(folder_id, file_type)`: Escribe una consulta para Google Drive.
-- `process_drive_directory(folder_id)`: Procesa una carpeta de Google Drive.
-- `extract_google_audio(video_id)`: Extrae el audio de un video de Google.
-- `extract_local_audio(video_path)`: Extrae el audio de un video local.
-- `transcribe_audio()`: Transcribe el audio.
-- `clean_up()`: Limpia los archivos intermedios.
-- `process()`: Inicia el proceso de transcripción.
+Las contribuciones son bienvenidas. Por favor, abra un problema para discutir lo que le gustaría cambiar o enviar una solicitud de extracción.
 
-## Nota
+## Licencia
 
-Este código aún está en desarrollo y puede contener errores. Por favor, utilícelo con precaución.
+[MIT](https://choosealicense.com/licenses/mit/)
