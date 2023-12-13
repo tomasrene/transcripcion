@@ -9,6 +9,7 @@ from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.getLogger("pydub").setLevel(logging.ERROR)
 
 class SourceType(Enum):
     """
@@ -226,7 +227,8 @@ class Transcriptor:
                 'preferredcodec': self.audio_file_type.value,
                 'preferredquality': '192'
             }],
-            'outtmpl': str(self.intermediate_folder / '%(title)s.%(ext)s')
+            'outtmpl': str(self.intermediate_folder / '%(title)s.%(ext)s'),
+            'quiet': True
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -326,9 +328,10 @@ class Transcriptor:
             file_name = file.stem
             audio = AudioSegment.from_mp3(file)
             audio_chunks = [audio[i:i + 1200000] for i in range(0, len(audio), 1200000)]
-
+            
             with open(self.output_folder / f'{file_name}.{self.output_format.value}', 'w', encoding='utf-8') as f:
                 for i, chunk in enumerate(audio_chunks):
+                    logging.info("Transcribing chunk %s of %s...", i+1, len(audio_chunks))
                     temp_file_name = f'./{self.intermediate_folder}/{file_name}-chunk{i+1}'
                     chunk.export(temp_file_name, format=self.audio_file_type.value)
                     result = model.transcribe(temp_file_name, fp16=False)
